@@ -1,0 +1,54 @@
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+       integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+       crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+       integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+       crossorigin=""></script>
+    <script
+			  src="https://code.jquery.com/jquery-3.6.0.js"
+			  integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk="
+			  crossorigin="anonymous"></script>
+    <script src="leafMET.js"></script>
+
+<style>
+
+
+</style>
+</head>
+
+<body style="border:0;margin:0;">
+    
+    <div id="TravelNotes-Map" style="width:100vw; height:100vh;z-index:0"></div>
+
+</body>
+
+<script>
+//Create Leaflet map and load OSM layer
+var o = L.map('TravelNotes-Map').setView([39.5, -1], 8);
+
+var osm = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+//osm.addTo(o);
+
+        var IGN = window.L.tileLayer.wms("https://www.ign.es/wms-inspire/ign-base", {
+    		layers: 'IGNBaseTodo-gris',
+    		format: 'image/png',
+    		transparent: true,
+    		attribution: "BCN IGN © 2022"
+		});
+IGN.addTo(o);
+
+leafMET(o);
+o.on('moveend', colocaEnLaVista);
+
+
+</script>
+
+</html>
+
