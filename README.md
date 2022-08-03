@@ -10,3 +10,5 @@ AEMET data for Leaflet JS
   `var map=L.map`
   - Call leafMET using:
   `leafMET(map)`
+  
+  Check the code for further details and see the [demo here](https://theroamingworkshop.cloud/leafMET).
