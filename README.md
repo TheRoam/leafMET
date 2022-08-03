@@ -12,3 +12,9 @@ AEMET data for Leaflet JS
   `leafMET(map)`
   
   Check the code for further details and see the [demo here](https://theroamingworkshop.cloud/leafMET).
+  
+## Mobile shortcut
+
+The file "leafMET.html" is a single-file working app.
+
+Download this file on your mobile device and open in your browser to play the app.
