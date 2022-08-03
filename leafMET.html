@@ -40,18 +40,16 @@ var o = L.map('mapa').setView([40.5, -3.5], 8);
 IGN.addTo(o);
 
 
-leafMET(o);
+leafMET();
 o.on('moveend', colocaEnLaVista);
 
 var datosMET=null;
 var sta=[];
 var pinta="cross";
 var ini=0;
-var map="";
 
-function leafMET(m){
+function leafMET(){
 
-    map=m;
     //Create button
     var btmet = window.document.createElement("BUTTON");
     btmet.id="btmet";
@@ -199,7 +197,7 @@ function colocaEnLaVista(){
         if(vista.contains(sta[s].getLatLng())){
             var cobertura=o.distance(o.getBounds().getNorthEast(),o.getBounds().getSouthEast());
             sta[s].setRadius(cobertura/30);
-            sta[s].addTo(map);
+            sta[s].addTo(o);
         }else if(sta[s]){
             sta[s].remove();
         }
