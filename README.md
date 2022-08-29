@@ -1,5 +1,7 @@
 # leafMET
-AEMET data for Leaflet JS
+A library to display latest AEMET data in Leaflet JS
+
+**Usage:**
 
 1. Create a basic Leaflet JS map
 
