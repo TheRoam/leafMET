@@ -40,7 +40,7 @@ var o = L.map('mapa').setView([40.5, -3.5], 8);
 IGN.addTo(o);
 
 
-leafMET();
+leafMET(o);
 o.on('moveend', colocaEnLaVista);
 
 var datosMET=null;
@@ -48,8 +48,9 @@ var sta=[];
 var pinta="cross";
 var ini=0;
 
-function leafMET(){
+function leafMET(m){
 
+    map=m;
     //Create button
     var btmet = window.document.createElement("BUTTON");
     btmet.id="btmet";
@@ -137,7 +138,7 @@ function loader(){
 }
 
 
-function getAEMET(){
+function getAEMET(est){
     //show loading message
     loader();
     //http GET request to data
@@ -145,9 +146,10 @@ function getAEMET(){
 
     var xhr = new XMLHttpRequest();
     var xhd = new XMLHttpRequest();
-    xhr.withCredentials = true;
-    xhd.withCredentials = true;
+    xhr.withCredentials = true; //API request
+    xhd.withCredentials = true; //Data request resulting from API request
 
+	//Make the request to the API
     xhr.onload= function () {
         var consulta= JSON.parse(this.responseText);
         xhd.open("GET", consulta.datos);
@@ -165,24 +167,58 @@ function getAEMET(){
 
 function loadAEMET(d){
     var obj=d.length;
+	var cods=[];
 
     //loop to plot stations (s) as circles using station coordinate data
     for (var s=0; s < obj; s++){
-        sta[s]=window.L.circle([d[s].lat, d[s].lon],{radius: 5000, weight: 0, opcaity: 0.0, fillColor: "RoyalBlue", fillOpacity: 0.01});
-        //add name data
-        sta[s].title=d[s].ubi;
-        //add data values (temp, wind speed and rain)
-        sta[s].temp=d[s].ta;
-        sta[s].viento=d[s].vmax;
-        sta[s].lluvia=d[s].prec;
+		//check if station code exists already
+		if(cods.includes(d[s].idema)==true){
+			//si existe, comprobar la fecha
+			sta.forEach((val,ind,arr)=>{
+				if(arr[ind].cod==d[s].idema){
+					if(d[s].fint>arr[ind].date){
+						arr[ind].date=d[s].fint;
+						arr[ind].temp=d[s].ta;
+						arr[ind].viento=d[s].vmax;
+						arr[ind].lluvia=d[s].prec;
 
-        var prop="<p><b>"+d[s].ubi+"</b></p>";
-        prop=prop+"<p>"+d[s].fint+"</p>";
-        prop=prop+"<p><b>Temperatura: </b>"+sta[s].temp+" ºC</p>";
-        prop=prop+"<p><b>Viento: </b>"+sta[s].viento+" km/h</p>";
-        prop=prop+"<p><b>Lluvia: </b>"+sta[s].lluvia+" mm</p>";
-        sta[s].bindPopup(prop);
-    }
+						var prop="<p><b>"+arr[ind].title+"</b></p>";
+						prop=prop+"<p>"+arr[ind].date+"</p>";
+						prop=prop+"<p><b>Temperatura: </b>"+arr[ind].temp+" ºC</p>";
+						prop=prop+"<p><b>Viento: </b>"+arr[ind].viento+" km/h</p>";
+						prop=prop+"<p><b>Lluvia: </b>"+arr[ind].lluvia+" mm</p>";
+						arr[ind].bindPopup(prop);
+					}
+				}
+			});
+			continue; //ir a la siguiente iteración
+		}else{
+			//add code to list
+			cods.push(d[s].idema);
+			//define circle marker
+			sta[s]=window.L.circle([d[s].lat, d[s].lon],{radius: 5000, weight: 0, opacity: 0.0, fillColor: "RoyalBlue", fillOpacity: 0.5});
+			//add name data
+			sta[s].title=d[s].ubi;
+			//add station code
+			sta[s].cod=d[s].idema;
+
+			//add data values (date, temp, wind speed and rain)
+			
+			sta[s].date=d[s].fint;
+			sta[s].temp=d[s].ta;
+			sta[s].viento=d[s].vmax;
+			sta[s].lluvia=d[s].prec;
+		}
+		
+		var prop="<p><b>"+sta[s].title+"</b></p>";
+		prop=prop+"<p>"+sta[s].date+"</p>";
+		prop=prop+"<p><b>Temperatura: </b>"+sta[s].temp+" ºC</p>";
+		prop=prop+"<p><b>Viento: </b>"+sta[s].viento+" km/h</p>";
+		prop=prop+"<p><b>Lluvia: </b>"+sta[s].lluvia+" mm</p>";
+		sta[s].bindPopup(prop);
+	}
+	//console.log(cods);
+	//console.log(sta);
     //remove loading message
     window.document.getElementById("ldmet").style.display="none";
     //update stations visible in view
@@ -193,11 +229,11 @@ function colocaEnLaVista(){
     //Plot only stations visible in view bounds
     var vista=o.getBounds();
     for (var s in sta){
-    sta[s].setStyle({fillOpacity: 0.01,fill: 0.01});
+    sta[s].setStyle({fillOpacity: 0.5,fill: 0.5});
         if(vista.contains(sta[s].getLatLng())){
             var cobertura=o.distance(o.getBounds().getNorthEast(),o.getBounds().getSouthEast());
             sta[s].setRadius(cobertura/30);
-            sta[s].addTo(o);
+            sta[s].addTo(map);
         }else if(sta[s]){
             sta[s].remove();
         }
@@ -260,7 +296,7 @@ function colocaEnLaVista(){
 function pintaMET(){
     //only download data at start
 	if(ini==0){
-    getAEMET();
+    getAEMET(sta);
     ini=1;
     }
     //empty legend
@@ -353,6 +389,7 @@ function pintaMET(){
     //update stations visible in view
     colocaEnLaVista();
 }
+
 
 
 </script>
