@@ -1,0 +1,619 @@
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+    <title>leafMET+Turf</title> 
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤</text></svg>">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+       integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+       crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+       integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+       crossorigin=""></script>
+	<script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+<style>
+.leaflet-tooltip {
+	background-color:rgba(0,0,0,0);
+	border:none;
+	box-shadow:none;
+	font-weight:bold;
+	text-shadow: 0 0 2px black, 0 0 2px black;
+}
+.leaflet-tooltip-pane {
+	z-Index:1001;
+}
+.leaflet-popup-pane {
+	z-Index:1002;
+}
+.leaflet-marker-pane {
+	z-Index:1003;
+}
+
+</style>
+</head>
+
+<body style="border:0;margin:0;">
+    
+    <div id="mapa" style="width:100vw; height:100vh;z-index:0"></div>
+
+</body>
+
+<script>
+//Create Leaflet map and load OSM layer
+var o = L.map('mapa').setView([40.5, -3.5], 8);
+
+        var IGN = window.L.tileLayer.wms("https://www.ign.es/wms-inspire/ign-base", {
+    		//layers: 'IGNBaseTodo-gris',
+			layers: 'IGNBaseTodo',
+    		format: 'image/png',
+    		transparent: true,
+    		attribution: "BCN IGN © 2022"
+		});
+IGN.addTo(o);
+
+
+leafMET(o);
+o.on('moveend', colocaEnLaVista);
+
+var datosMET=null;
+var sta=[];
+var pinta="cross";
+var ini=0;
+
+function leafMET(m){
+
+    map=m;
+    //Create button
+    var btmet = window.document.createElement("BUTTON");
+    btmet.id="btmet";
+    btmet.title="Cargar datos meteorológicos";
+    btmet.innerHTML="<b>🌤</b>";
+    btmet.style.zIndex="1000";
+    btmet.style.position="absolute";
+    btmet.style.top="100px";
+    btmet.style.left="10px";
+    btmet.style.fontSize="16px";
+	btmet.style.textAlign="center";
+    btmet.style.width="35px";
+    btmet.style.height="35px";
+    btmet.style.background="Turquoise";
+	btmet.style.border="0px solid black";
+    btmet.style.borderRadius="5px";
+    btmet.style.cursor="pointer";
+    btmet.addEventListener("click", pintaMET);
+    window.document.body.appendChild(btmet);
+    //Create subtitle
+    var mtxt = window.document.createElement("P");
+    mtxt.id="mtxt";
+    mtxt.innerHTML="<b>Carga</b>";
+    mtxt.title="Cargar datos meteorológicos";
+    mtxt.style.zIndex="1000";
+    mtxt.style.position="absolute";
+    mtxt.style.top="130px";
+    mtxt.style.left="7px";
+    mtxt.style.fontSize="10px";
+	mtxt.style.textAlign="center";
+    mtxt.style.width="40px";
+    mtxt.style.height="15px";
+    mtxt.style.background="DarkOrange";
+	mtxt.style.border="0px solid black";
+    mtxt.style.borderRadius="2px";
+    mtxt.style.cursor="context-menu";
+    mtxt.style.fontFamily="Arial";
+    window.document.body.appendChild(mtxt);
+    //Create key
+    for (var i=1; i<=6;i++){
+        var mkey = window.document.createElement("P");
+        mkey.id="mkey"+i;
+        mkey.innerHTML="<b>"+i+"</b>";
+        mkey.style.zIndex="1000";
+        mkey.style.position="absolute";
+        var pos = 140+i*16;
+        pos = pos+"px";
+        mkey.style.top=pos;
+        mkey.style.left="7px";
+        mkey.style.fontSize="10px";
+	    mkey.style.textAlign="center";
+	    mkey.style.textIndent="0px";
+        mkey.style.width="40px";
+        mkey.style.height="15px";
+        mkey.style.background="DarkOrange";
+        mkey.style.opacity="0.75";
+	    mkey.style.border="0px solid black";
+        mkey.style.borderRadius="2px";
+        mkey.style.cursor="context-menu";
+        mkey.style.fontFamily="Arial";
+        mkey.style.fontWeight="bold";
+        mkey.style.color="black";
+        mkey.style.display="none";
+        window.document.body.appendChild(mkey);
+    }
+}
+
+//Create loading message
+function loader(){
+    var ldmet = window.document.createElement("P");
+    ldmet.id="ldmet";
+    ldmet.innerHTML="CARGANDO DATOS METEOROLÓGICOS";
+    ldmet.style.zIndex="1000";
+    ldmet.style.position="relative";
+    ldmet.style.top="-50vh";
+    ldmet.style.width="250px";
+	ldmet.style.margin="auto";
+	ldmet.style.textAlign="center";
+    ldmet.style.background="DarkOrange";
+    ldmet.style.fontWeight="bold";
+    ldmet.style.fontSize="11px";
+    ldmet.style.padding="4px 4px 4px 4px";
+    ldmet.style.fontFamily="Arial";
+    window.document.body.appendChild(ldmet);
+}
+
+
+function getAEMET(est){
+    //show loading message
+    loader();
+    //http GET request to data
+    var data = null;
+
+    var xhr = new XMLHttpRequest();
+    var xhd = new XMLHttpRequest();
+    xhr.withCredentials = true; //API request
+    xhd.withCredentials = true; //Data request resulting from API request
+
+	//Make the request to the API
+    xhr.onload= function () {
+        var consulta= JSON.parse(this.responseText);
+        xhd.open("GET", consulta.datos);
+        xhd.send();
+    }
+    xhd.onload= function () {
+        data= JSON.parse(this.responseText);
+        loadAEMET(data);
+    }
+
+    xhr.open("GET", "https://opendata.aemet.es/opendata/api/observacion/convencional/todas?api_key=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJyb21hbmhkZXpnb3JyaW5AZ21haWwuY29tIiwianRpIjoiZmFiMTM1N2QtNTJhMC00ZWQ1LWFkNzYtNjY5YTAzNGI4YTFlIiwiaXNzIjoiQUVNRVQiLCJpYXQiOjE1NzAxMjM2MzIsInVzZXJJZCI6ImZhYjEzNTdkLTUyYTAtNGVkNS1hZDc2LTY2OWEwMzRiOGExZSIsInJvbGUiOiIifQ.-7vQF_TJLghx3g4t3GiHzlWt52LpMChqqtfNUhW07LQ");
+    xhr.setRequestHeader("cache-control", "no-cache");
+    xhr.send(data);
+}
+
+function loadAEMET(d){
+    var obj=d.length;
+	var cods=[];
+
+    //loop to plot stations (s) as circles using station coordinate data
+    for (var s=0; s < obj; s++){
+		//check if station code exists already
+		if(cods.includes(d[s].idema)==true){
+			//si existe, comprobar la fecha
+			sta.forEach((val,ind,arr)=>{
+				if(arr[ind].cod==d[s].idema){
+					if(d[s].fint>arr[ind].date){
+						arr[ind].date=d[s].fint;
+						arr[ind].temp=d[s].ta;
+						arr[ind].viento=d[s].vmax;
+						arr[ind].lluvia=d[s].prec;
+
+						var prop="<p><b>"+arr[ind].title+"</b></p>";
+						prop=prop+"<p>"+arr[ind].date+"</p>";
+						prop=prop+"<p><b>Temperatura: </b>"+arr[ind].temp+" ºC</p>";
+						prop=prop+"<p><b>Viento: </b>"+arr[ind].viento+" km/h</p>";
+						prop=prop+"<p><b>Lluvia: </b>"+arr[ind].lluvia+" mm</p>";
+						arr[ind].bindPopup(prop);
+					}
+				}
+			});
+			continue; //ir a la siguiente iteración
+		}else{
+			//add code to list
+			cods.push(d[s].idema);
+			//define circle marker (REMOVED FOR TURFJS)
+			sta[s]=window.L.circle([d[s].lat, d[s].lon],{radius: 5000, weight: 0, opacity: 0.0, fillColor: "RoyalBlue", fillOpacity: 0.0,zIndex:100});
+			//add name data
+			sta[s].title=d[s].ubi;
+			//add station code
+			sta[s].cod=d[s].idema;
+
+			//add data values (date, temp, wind speed and rain)
+			
+			sta[s].date=d[s].fint;
+			sta[s].temp=d[s].ta;
+			sta[s].viento=d[s].vmax;
+			sta[s].lluvia=d[s].prec;
+		}
+		
+		var prop="<p><b>"+sta[s].title+"</b></p>";
+		prop=prop+"<p>"+sta[s].date+"</p>";
+		prop=prop+"<p><b>Temperatura: </b>"+sta[s].temp+" ºC</p>";
+		prop=prop+"<p><b>Viento: </b>"+sta[s].viento+" km/h</p>";
+		prop=prop+"<p><b>Lluvia: </b>"+sta[s].lluvia+" mm</p>";
+		sta[s].bindPopup(prop);
+	}
+	//console.log(cods);
+	//console.log(sta);
+    //remove loading message
+    window.document.getElementById("ldmet").style.display="none";
+    //update stations visible in view
+    colocaEnLaVista();
+}
+
+function colocaEnLaVista(){
+    //Plot only stations visible in view bounds
+	var zoom=o.getZoom();
+    var vista=o.getBounds();
+	var usados=[];
+	var malla="";
+    for (var s in sta){
+    sta[s].setStyle({fillOpacity: 0.0,fill: 0.1});
+        if(vista.contains(sta[s].getLatLng())){
+            var cobertura=o.distance(o.getBounds().getNorthEast(),o.getBounds().getSouthEast());
+            sta[s].setRadius(cobertura/30);
+            sta[s].addTo(map);
+			//add tooltip with values
+			sta[s].closeTooltip();
+			sta[s].bindTooltip(sta[s].cod,{permanent:true});
+			//add to FeatureCollection
+			usados.push(turf.point([sta[s].getLatLng().lng,sta[s].getLatLng().lat],{cod:sta[s].cod,temp:sta[s].temp,viento:sta[s].viento,lluvia:sta[s].lluvia}));
+        }else if(sta[s]){
+            sta[s].remove();
+        }
+		
+    //edit stations display color according to data value
+    switch(pinta){
+    case "viento":
+        if (sta[s].viento==null || sta[s].viento<0){
+            sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
+			//sta[s].setStyle({fillOpacity: 0.0,fill: 0.0, cursor: "none"});
+        }else if (sta[s].viento>=0 && sta[s].viento<5){
+            sta[s].setTooltipContent("<span style='color:green;'>"+JSON.stringify(sta[s].viento)+"</span>");
+			//sta[s].setStyle({fillColor: "green"});
+        }else if (sta[s].viento>=5 && sta[s].viento<10){
+            sta[s].setTooltipContent("<span style='color:yellow;'>"+JSON.stringify(sta[s].viento)+"</span>");
+			//sta[s].setStyle({fillColor: "yellow"});
+        }else if (sta[s].viento>=10 && sta[s].viento<20){
+            sta[s].setTooltipContent("<span style='color:orange;'>"+JSON.stringify(sta[s].viento)+"</span>");
+			//sta[s].setStyle({fillColor: "orange"});
+        }else if (sta[s].viento>=20 && sta[s].viento<30){
+            sta[s].setTooltipContent("<span style='color:red;'>"+JSON.stringify(sta[s].viento)+"</span>");
+			//sta[s].setStyle({fillColor: "red"});
+        }else if (sta[s].viento>=30 && sta[s].viento<500){
+            sta[s].setTooltipContent("<span style='color:purple;'>"+JSON.stringify(sta[s].viento)+"</span>");
+			//sta[s].setStyle({fillColor: "purple"});
+        }
+		//mostramos el valor según el zoom
+		if(zoom>7){
+			sta[s].openTooltip();
+		}else{
+			sta[s].closeTooltip();
+		}
+		
+    break;
+    case "lluvia":
+        if (sta[s].lluvia==null || sta[s].lluvia<=0){
+            sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
+			//sta[s].setStyle({fillOpacity: 0.0, fill: 0.0, cursor: "none"});
+        }else if (sta[s].lluvia>0 && sta[s].lluvia<2){
+            sta[s].setTooltipContent("<span style='color:LightCyan;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "LightCyan"});
+        }else if (sta[s].lluvia>=2 && sta[s].lluvia<5){
+            sta[s].setTooltipContent("<span style='color:LightSkyBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "LightSkyBlue"});
+        }else if (sta[s].lluvia>=5 && sta[s].lluvia<10){
+            sta[s].setTooltipContent("<span style='color:SkyBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "SkyBlue"});
+        }else if (sta[s].lluvia>=10 && sta[s].lluvia<20){
+            sta[s].setTooltipContent("<span style='color:DodgerBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "DodgerBlue"});
+        }else if (sta[s].lluvia>=20 && sta[s].lluvia<30){
+            sta[s].setTooltipContent("<span style='color:Blue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "Blue"});
+        }else if (sta[s].lluvia>=30 && sta[s].lluvia<500){
+            sta[s].setTooltipContent("<span style='color:DarkBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
+			//sta[s].setStyle({fillColor: "DarkBlue"});
+        }
+		//mostramos el valor según el zoom
+		if(zoom>7){
+			sta[s].openTooltip();
+		}else{
+			sta[s].closeTooltip();
+		}
+		
+    break;
+    case "temp":
+        if (sta[s].temp==null || sta[s].temp<=0){            
+            sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
+			//sta[s].setStyle({fillOpacity: 0.0, fill: 0.0, cursor: "none"});
+        }else if (sta[s].temp>0 && sta[s].temp<5){
+			sta[s].setTooltipContent("<span style='color:LightCyan;'>"+JSON.stringify(sta[s].temp)+"</span>");
+            //sta[s].setStyle({color: "LightCyan"});
+        }else if (sta[s].temp>=5 && sta[s].temp<10){
+			sta[s].setTooltipContent("<span style='color:DodgerBlue;'>"+JSON.stringify(sta[s].temp)+"</span>");
+            //sta[s].setStyle({color: "DodgerBlue"});
+        }else if (sta[s].temp>=10 && sta[s].temp<20){
+            sta[s].setTooltipContent("<span style='color:SpringGreen;'>"+JSON.stringify(sta[s].temp)+"</span>");
+			//sta[s].setStyle({color: "SpringGreen"});
+        }else if (sta[s].temp>=20 && sta[s].temp<30){
+            sta[s].setTooltipContent("<span style='color:Gold;'>"+JSON.stringify(sta[s].temp)+"</span>");
+			//sta[s].setStyle({color: "Gold"});
+        }else if (sta[s].temp>=30 && sta[s].temp<100){
+            sta[s].setTooltipContent("<span style='color:DarkOrange;'>"+JSON.stringify(sta[s].temp)+"</span>");
+			//sta[s].setStyle({color: "DarkOrange"});
+        }
+		//mostramos el valor según el zoom
+		if(zoom>7){
+			sta[s].openTooltip();
+		}else{
+			sta[s].closeTooltip();
+		}
+		
+    break;
+    case "cross":     
+            sta[s].remove();
+    break;
+    }
+    }
+
+	//CREAR INTERPOLACIONES
+	var size=20;
+	switch(pinta){
+    case "viento":
+		//eliminar la malla anterior, si existe
+		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
+		//filtramos los valores de temperatura negativos o sobrantes
+		usados=usados.filter((val,ind,arr)=>{
+			return arr[ind].properties.viento>0;
+		});
+		usados=turf.featureCollection(usados);
+		
+		//ISOBANDAS
+		//crear la malla nueva para isobanda
+		malla=turf.interpolate(usados,size,{gridType:"point",property:"viento",units:"kilometers",weight:3});
+		//crear isobandas
+		malla=turf.isobands(malla,[-1,0,5,10,20,30,500],{zProperty:"viento"});
+		//añadir al mapa
+		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+				switch (feature.properties.viento){
+						case String("-1-0"):
+							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("0-5"):
+							return {fillColor: "green", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("5-10"):
+							return {fillColor: "yellow", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("10-20"):
+							return {fillColor: "orange", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("20-30"):
+							return {fillColor: "red", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("30-100"):
+							return {fillColor: "purple", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+							}
+						}
+		}).addTo(o);
+
+	break;
+	case "lluvia":
+		//eliminar la malla anterior, si existe
+		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
+		//filtramos los valores de temperatura negativos o sobrantes
+		usados=usados.filter((val,ind,arr)=>{
+			return arr[ind].properties.lluvia>0;
+		});
+		usados=turf.featureCollection(usados);
+		
+		//ISOBANDAS
+		//crear la malla nueva para isobanda
+		malla=turf.interpolate(usados,size,{gridType:"point",property:"lluvia",units:"kilometers",weight:3});
+		//crear isobandas
+		malla=turf.isobands(malla,[-1,0,2,5,10,20,30,500],{zProperty:"lluvia"});
+		//añadir al mapa
+		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+				switch (feature.properties.lluvia){
+						case String("-1-0"):
+							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("0-2"):
+							return {fillColor: "lightcyan", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("2-5"):
+							return {fillColor: "lightskyblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("5-10"):
+							return {fillColor: "skyblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("10-20"):
+							return {fillColor: "dodgerblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("20-30"):
+							return {fillColor: "blue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("30-100"):
+							return {fillColor: "darkblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+							}
+						}
+		}).addTo(o);
+
+	break;
+	case "temp":
+		//eliminar la malla anterior, si existe
+		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
+		//filtramos los valores de temperatura negativos o sobrantes
+		usados=usados.filter((val,ind,arr)=>{
+			return arr[ind].properties.temp>0;
+		});
+		usados=turf.featureCollection(usados);
+		
+		//ISOBANDAS
+		//crear la malla nueva para isobanda
+		malla=turf.interpolate(usados,size,{gridType:"point",property:"temp",units:"kilometers",weight:3});
+		//crear isobandas
+		malla=turf.isobands(malla,[-1,0,5,10,20,30,100],{zProperty:"temp"});
+		//añadir al mapa
+		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+				switch (feature.properties.temp){
+						case String("-1-0"):
+							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("0-5"):
+							return {fillColor: "lightcyan", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("5-10"):
+							return {fillColor: "dodgerblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("10-20"):
+							return {fillColor: "springgreen", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("20-30"):
+							return {fillColor: "gold", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+						case String("30-100"):
+							return {fillColor: "darkorange", fillOpacity: 0.2, weight: 0,zIndex:0};
+							break;
+							}
+						}
+		}).addTo(o);
+		
+		//RECTANGULAR
+		//malla para rectangular
+		/*malla=turf.interpolate(usados,size,{gridType:"square",property:"temp",units:"kilometers",weight:5});
+		//añadir al mapa
+		malla=L.geoJSON(malla,{pane:"turf",name:"turf",style: function(feature){
+				var val=feature.properties.temp;
+					switch (true){
+						case (val<0):
+							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0};
+							break;
+						case (val>=0 && val < 5):
+							return {fillColor: "lightcyan", fillOpacity: 0.2, weight: 0};
+							break;
+						case (5 <=val && val < 10):
+							return {fillColor: "dodgerblue", fillOpacity: 0.2, weight: 0};
+							break;
+						case (10 <=val && val < 20):
+							return {fillColor: "springgreen", fillOpacity: 0.2, weight: 0};
+							break;
+						case (20 <=val && val < 30):
+							return {fillColor: "gold", fillOpacity: 0.2, weight: 0};
+							break;
+						case (30 <=val):
+							return {fillColor: "darkorange", fillOpacity: 0.2, weight: 0};
+							break;
+							}
+						}
+		}).addTo(o);*/
+	break;
+	}
+}
+
+function pintaMET(){
+    //only download data at start
+	if(ini==0){
+    getAEMET(sta);
+    ini=1;
+    }
+    //empty legend
+    for (var i=1; i<=6;i++){
+        window.document.getElementById("mkey"+i).style.display= "none";
+        window.document.getElementById("mkey"+i).style.color="black";
+        }
+    //generate new legend for each type of data
+    //(using the current icon to define the next key)
+    if (pinta=="cross"){
+        pinta="temp";
+        window.document.getElementById("btmet").innerHTML="🌡";
+    	window.document.getElementById("btmet").title="Temperatura (ºC)";
+        window.document.getElementById("mtxt").innerHTML="<b>T (ºC)</b>";
+        window.document.getElementById("mtxt").title="Temperatura (ºC)";
+        //set key
+        mkey1.style.display="block";
+        mkey1.style.background="LightCyan";
+        mkey1.innerHTML="0 - 5";
+        mkey2.style.display="block";
+        mkey2.style.background="DodgerBlue";
+        mkey2.innerHTML="5 - 10";
+        mkey3.style.display="block";
+        mkey3.style.background="SpringGreen";
+        mkey3.innerHTML="10 - 20";
+        mkey4.style.display="block";
+        mkey4.style.background="Gold";
+        mkey4.innerHTML="20 - 30";
+        mkey5.style.display="block";
+        mkey5.style.background="DarkOrange";
+        mkey5.innerHTML="> 30";
+    }else if(pinta=="temp"){
+        pinta="viento";
+        window.document.getElementById("btmet").innerHTML="🌪";
+    	window.document.getElementById("btmet").title="Viento (Km/h)";
+        window.document.getElementById("mtxt").innerHTML="<b>V(km/h)</b>";
+        window.document.getElementById("mtxt").title="Viento (Km/h)";
+        //set key
+        mkey1.style.display="block";
+        mkey1.style.background="green";
+        mkey1.innerHTML="0 - 5";
+        mkey2.style.display="block";
+        mkey2.style.background="yellow";
+        mkey2.innerHTML="5 - 10";
+        mkey3.style.display="block";
+        mkey3.style.background="orange";
+        mkey3.innerHTML="10 - 20";
+        mkey4.style.display="block";
+        mkey4.style.background="red";
+        mkey4.innerHTML="20 - 30";
+        mkey4.style.color="white";
+        mkey5.style.display="block";
+        mkey5.style.background="purple";
+        mkey5.innerHTML="> 30";
+        mkey5.style.color="white";
+    }else if(pinta=="lluvia"){
+        pinta="cross";
+        window.document.getElementById("btmet").innerHTML="❌";
+    	window.document.getElementById("btmet").title="Sin clima";
+        window.document.getElementById("mtxt").innerHTML="<b>-</b>";
+        window.document.getElementById("mtxt").title="Sin clima";
+    }else if(pinta=="viento"){
+        pinta="lluvia";
+        window.document.getElementById("btmet").innerHTML="☔";
+    	window.document.getElementById("btmet").title="Precipitación (l/m²)";
+        window.document.getElementById("mtxt").innerHTML="<b>P (mm)</b>";
+        window.document.getElementById("mtxt").title="Precipitación (l/m²)";
+        //set key
+        mkey1.style.display="block";
+        mkey1.style.background="LightCyan";
+        mkey1.innerHTML="0 - 2";
+        mkey2.style.display="block";
+        mkey2.style.background="LightSkyBlue";
+        mkey2.innerHTML="2 - 5";
+        mkey3.style.display="block";
+        mkey3.style.background="SkyBlue";
+        mkey3.innerHTML="5 - 10";
+        mkey4.style.display="block";
+        mkey4.style.background="DodgerBlue";
+        mkey4.innerHTML="10 - 20";
+        mkey5.style.display="block";
+        mkey5.style.background="Blue";
+        mkey5.innerHTML="20 - 30";
+        mkey5.style.color="white";
+        mkey6.style.display="block";
+        mkey6.style.background="DarkBlue";
+        mkey6.innerHTML="> 30";
+        mkey6.style.color="white";
+    }
+    //update stations visible in view
+    colocaEnLaVista();
+}
+
+
+
+</script>
+
+</html>
+
