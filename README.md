@@ -1,22 +1,14 @@
-# leafMET
-A library to display latest AEMET data in Leaflet JS
+# leafMET+Turf
+A library to display latest AEMET data in Leaflet JS.
+
+This branch includes TurfJS for interpolating data.
 
 **Usage:**
 
-1. Create a basic Leaflet JS map
+The file "leafMET+Turf.html" is a single-file working app that includes data interpolation using TurfJS
 
-2. Link the leafMET.js library in your document
+You can download this file on your mobile device and open in your browser to play the app.
 
-3. Call leafMET with reference to your map (see .html example). I.e.:
-  - If your map is in a variable called "map"
-  `var map=L.map`
-  - Call leafMET using:
-  `leafMET(map)`
+  Check the code for further details and see the [demo here](https://theroamingworkshop.cloud/leafMET/leafMET+Turf.html).
   
-  Check the code for further details and see the [demo here](https://theroamingworkshop.cloud/leafMET).
-  
-## Mobile shortcut
 
-The file "leafMET.html" is a single-file working app.
-
-Download this file on your mobile device and open in your browser to play the app.
