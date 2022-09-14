@@ -16,6 +16,9 @@
        crossorigin=""></script>
 	<script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
 <style>
+.leaflet-popup-content{
+	max-width:150px;
+}
 .leaflet-tooltip {
 	background-color:rgba(0,0,0,0);
 	border:none;
@@ -23,14 +26,24 @@
 	font-weight:bold;
 	text-shadow: 0 0 2px black, 0 0 2px black;
 }
+.leaflet-tooltip-right:before, .leaflet-tooltip-left:before{
+	display:none;
+}
 .leaflet-tooltip-pane {
 	z-Index:1001;
 }
-.leaflet-popup-pane {
+.leaflet-marker-pane {
 	z-Index:1002;
 }
-.leaflet-marker-pane {
+.leaflet-overlay-pane {
+	z-Index:1002;
+}
+.leaflet-popup-pane {
 	z-Index:1003;
+}
+.leaflet-turf-pane {
+	z-Index:1000;
+	cursor: grab;
 }
 
 </style>
@@ -44,7 +57,9 @@
 
 <script>
 //Create Leaflet map and load OSM layer
-var o = L.map('mapa').setView([40.5, -3.5], 8);
+var o = L.map('mapa',{	//added option to remove default attribution
+	attributionControl: false
+	}).setView([40.5, -3.5], 8);
 
         var IGN = window.L.tileLayer.wms("https://www.ign.es/wms-inspire/ign-base", {
     		//layers: 'IGNBaseTodo-gris',
@@ -54,14 +69,19 @@ var o = L.map('mapa').setView([40.5, -3.5], 8);
     		attribution: "BCN IGN © 2022"
 		});
 IGN.addTo(o);
+o.createPane("turf");
 
+//Custom attribution bar
+L.control.attribution({
+	prefix:"Made with <a href='https://leafletjs.com' target='_blank'>LeafletJS</a> and <a href='https://turfjs.com' target='_blank'>TurfJS</a>",
+}).addTo(o);
 
 leafMET(o);
 o.on('moveend', colocaEnLaVista);
 
 var datosMET=null;
 var sta=[];
-var pinta="cross";
+var pinta="lluvia"; //initial variable
 var ini=0;
 
 function leafMET(m){
@@ -106,7 +126,7 @@ function leafMET(m){
     mtxt.style.fontFamily="Arial";
     window.document.body.appendChild(mtxt);
     //Create key
-    for (var i=1; i<=6;i++){
+    for (var i=1; i<=20;i++){
         var mkey = window.document.createElement("P");
         mkey.id="mkey"+i;
         mkey.innerHTML="<b>"+i+"</b>";
@@ -139,17 +159,19 @@ function loader(){
     var ldmet = window.document.createElement("P");
     ldmet.id="ldmet";
     ldmet.innerHTML="CARGANDO DATOS METEOROLÓGICOS";
-    ldmet.style.zIndex="1000";
-    ldmet.style.position="relative";
-    ldmet.style.top="-50vh";
-    ldmet.style.width="250px";
-	ldmet.style.margin="auto";
+    ldmet.style.zIndex="1007";
+	ldmet.style.display="block";
+    ldmet.style.position="absolute";
+    ldmet.style.top="45%";
+	ldmet.style.width="100vw";
+	ldmet.style.padding="10px 0px 10px 0px";
+	ldmet.style.margin="0";
 	ldmet.style.textAlign="center";
     ldmet.style.background="DarkOrange";
     ldmet.style.fontWeight="bold";
     ldmet.style.fontSize="11px";
-    ldmet.style.padding="4px 4px 4px 4px";
     ldmet.style.fontFamily="Arial";
+	ldmet.style.overflow="hidden";	
     window.document.body.appendChild(ldmet);
 }
 
@@ -157,6 +179,7 @@ function loader(){
 function getAEMET(est){
     //show loading message
     loader();
+	
     //http GET request to data
     var data = null;
 
@@ -167,6 +190,8 @@ function getAEMET(est){
 
 	//Make the request to the API
     xhr.onload= function () {
+		//Modify loading message
+		window.document.getElementById("ldmet").innerHTML="PROCESANDO DATOS";
         var consulta= JSON.parse(this.responseText);
         xhd.open("GET", consulta.datos);
         xhd.send();
@@ -192,14 +217,16 @@ function loadAEMET(d){
 			//si existe, comprobar la fecha
 			sta.forEach((val,ind,arr)=>{
 				if(arr[ind].cod==d[s].idema){
+					//vamos cogiendo la última fecha (la mayor)
 					if(d[s].fint>arr[ind].date){
-						arr[ind].date=d[s].fint;
+						arr[ind].date=d[s].fint; //Date is in UTC+0 format
 						arr[ind].temp=d[s].ta;
 						arr[ind].viento=d[s].vmax;
 						arr[ind].lluvia=d[s].prec;
 
+						var fecha=new Date(arr[ind].date+"Z");
 						var prop="<p><b>"+arr[ind].title+"</b></p>";
-						prop=prop+"<p>"+arr[ind].date+"</p>";
+						prop=prop+"<p>"+fecha.toLocaleDateString()+" "+fecha.toLocaleTimeString()+"</p>";
 						prop=prop+"<p><b>Temperatura: </b>"+arr[ind].temp+" ºC</p>";
 						prop=prop+"<p><b>Viento: </b>"+arr[ind].viento+" km/h</p>";
 						prop=prop+"<p><b>Lluvia: </b>"+arr[ind].lluvia+" mm</p>";
@@ -220,23 +247,22 @@ function loadAEMET(d){
 
 			//add data values (date, temp, wind speed and rain)
 			
-			sta[s].date=d[s].fint;
+			sta[s].date=d[s].fint; //Date is in UTC+0 format
 			sta[s].temp=d[s].ta;
 			sta[s].viento=d[s].vmax;
 			sta[s].lluvia=d[s].prec;
 		}
 		
+		var fecha=new Date(sta[s].date+"Z");
 		var prop="<p><b>"+sta[s].title+"</b></p>";
-		prop=prop+"<p>"+sta[s].date+"</p>";
+		prop=prop+"<p>"+fecha.toLocaleDateString()+" "+fecha.toLocaleTimeString()+"</p>";
 		prop=prop+"<p><b>Temperatura: </b>"+sta[s].temp+" ºC</p>";
 		prop=prop+"<p><b>Viento: </b>"+sta[s].viento+" km/h</p>";
 		prop=prop+"<p><b>Lluvia: </b>"+sta[s].lluvia+" mm</p>";
 		sta[s].bindPopup(prop);
 	}
-	//console.log(cods);
-	//console.log(sta);
-    //remove loading message
-    window.document.getElementById("ldmet").style.display="none";
+	//remove loading message
+	window.document.getElementById("ldmet").style.display="none";
     //update stations visible in view
     colocaEnLaVista();
 }
@@ -267,24 +293,18 @@ function colocaEnLaVista(){
     case "viento":
         if (sta[s].viento==null || sta[s].viento<0){
             sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
-			//sta[s].setStyle({fillOpacity: 0.0,fill: 0.0, cursor: "none"});
         }else if (sta[s].viento>=0 && sta[s].viento<5){
-            sta[s].setTooltipContent("<span style='color:green;'>"+JSON.stringify(sta[s].viento)+"</span>");
-			//sta[s].setStyle({fillColor: "green"});
+            sta[s].setTooltipContent("<span style='color:springgreen;'>"+JSON.stringify(sta[s].viento)+"</span>");
         }else if (sta[s].viento>=5 && sta[s].viento<10){
-            sta[s].setTooltipContent("<span style='color:yellow;'>"+JSON.stringify(sta[s].viento)+"</span>");
-			//sta[s].setStyle({fillColor: "yellow"});
+            sta[s].setTooltipContent("<span style='color:greenyellow;'>"+JSON.stringify(sta[s].viento)+"</span>");
         }else if (sta[s].viento>=10 && sta[s].viento<20){
             sta[s].setTooltipContent("<span style='color:orange;'>"+JSON.stringify(sta[s].viento)+"</span>");
-			//sta[s].setStyle({fillColor: "orange"});
         }else if (sta[s].viento>=20 && sta[s].viento<30){
             sta[s].setTooltipContent("<span style='color:red;'>"+JSON.stringify(sta[s].viento)+"</span>");
-			//sta[s].setStyle({fillColor: "red"});
         }else if (sta[s].viento>=30 && sta[s].viento<500){
             sta[s].setTooltipContent("<span style='color:purple;'>"+JSON.stringify(sta[s].viento)+"</span>");
-			//sta[s].setStyle({fillColor: "purple"});
         }
-		//mostramos el valor según el zoom
+		//show values according to zoom level
 		if(zoom>7){
 			sta[s].openTooltip();
 		}else{
@@ -295,27 +315,20 @@ function colocaEnLaVista(){
     case "lluvia":
         if (sta[s].lluvia==null || sta[s].lluvia<=0){
             sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
-			//sta[s].setStyle({fillOpacity: 0.0, fill: 0.0, cursor: "none"});
         }else if (sta[s].lluvia>0 && sta[s].lluvia<2){
             sta[s].setTooltipContent("<span style='color:LightCyan;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "LightCyan"});
         }else if (sta[s].lluvia>=2 && sta[s].lluvia<5){
             sta[s].setTooltipContent("<span style='color:LightSkyBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "LightSkyBlue"});
         }else if (sta[s].lluvia>=5 && sta[s].lluvia<10){
             sta[s].setTooltipContent("<span style='color:SkyBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "SkyBlue"});
         }else if (sta[s].lluvia>=10 && sta[s].lluvia<20){
             sta[s].setTooltipContent("<span style='color:DodgerBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "DodgerBlue"});
         }else if (sta[s].lluvia>=20 && sta[s].lluvia<30){
             sta[s].setTooltipContent("<span style='color:Blue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "Blue"});
         }else if (sta[s].lluvia>=30 && sta[s].lluvia<500){
             sta[s].setTooltipContent("<span style='color:DarkBlue;'>"+JSON.stringify(sta[s].lluvia)+"</span>");
-			//sta[s].setStyle({fillColor: "DarkBlue"});
         }
-		//mostramos el valor según el zoom
+		//show values according to zoom level
 		if(zoom>7){
 			sta[s].openTooltip();
 		}else{
@@ -326,24 +339,22 @@ function colocaEnLaVista(){
     case "temp":
         if (sta[s].temp==null || sta[s].temp<=0){            
             sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
-			//sta[s].setStyle({fillOpacity: 0.0, fill: 0.0, cursor: "none"});
-        }else if (sta[s].temp>0 && sta[s].temp<5){
+        }else if (sta[s].temp>-30 && sta[s].temp<0){
 			sta[s].setTooltipContent("<span style='color:LightCyan;'>"+JSON.stringify(sta[s].temp)+"</span>");
-            //sta[s].setStyle({color: "LightCyan"});
-        }else if (sta[s].temp>=5 && sta[s].temp<10){
+        }else if (sta[s].temp>=0 && sta[s].temp<10){
 			sta[s].setTooltipContent("<span style='color:DodgerBlue;'>"+JSON.stringify(sta[s].temp)+"</span>");
-            //sta[s].setStyle({color: "DodgerBlue"});
         }else if (sta[s].temp>=10 && sta[s].temp<20){
             sta[s].setTooltipContent("<span style='color:SpringGreen;'>"+JSON.stringify(sta[s].temp)+"</span>");
-			//sta[s].setStyle({color: "SpringGreen"});
-        }else if (sta[s].temp>=20 && sta[s].temp<30){
-            sta[s].setTooltipContent("<span style='color:Gold;'>"+JSON.stringify(sta[s].temp)+"</span>");
-			//sta[s].setStyle({color: "Gold"});
-        }else if (sta[s].temp>=30 && sta[s].temp<100){
-            sta[s].setTooltipContent("<span style='color:DarkOrange;'>"+JSON.stringify(sta[s].temp)+"</span>");
-			//sta[s].setStyle({color: "DarkOrange"});
+        }else if (sta[s].temp>=20 && sta[s].temp<25){
+            sta[s].setTooltipContent("<span style='color:GreenYellow;'>"+JSON.stringify(sta[s].temp)+"</span>");
+		}else if (sta[s].temp>=25 && sta[s].temp<30){
+            sta[s].setTooltipContent("<span style='color:darkorange;'>"+JSON.stringify(sta[s].temp)+"</span>");
+        }else if (sta[s].temp>=30 && sta[s].temp<35){
+            sta[s].setTooltipContent("<span style='color:red;'>"+JSON.stringify(sta[s].temp)+"</span>");
+        }else if (sta[s].temp>=35 && sta[s].temp<100){
+            sta[s].setTooltipContent("<span style='color:mediumpurple;'>"+JSON.stringify(sta[s].temp)+"</span>");
         }
-		//mostramos el valor según el zoom
+		//show values according to zoom level
 		if(zoom>7){
 			sta[s].openTooltip();
 		}else{
@@ -351,141 +362,134 @@ function colocaEnLaVista(){
 		}
 		
     break;
-    case "cross":     
-            sta[s].remove();
-    break;
     }
     }
-
-	//CREAR INTERPOLACIONES
-	var size=20;
+	
+	//INTERPOLATIONS
+	var size=10;
 	switch(pinta){
     case "viento":
-		//eliminar la malla anterior, si existe
+		//remove previous grid if it exists
 		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
-		//filtramos los valores de temperatura negativos o sobrantes
+		//filter null values
 		usados=usados.filter((val,ind,arr)=>{
 			return arr[ind].properties.viento>0;
 		});
 		usados=turf.featureCollection(usados);
 		
-		//ISOBANDAS
-		//crear la malla nueva para isobanda
+		//ISOBANDS
+		//create grid for isobands
 		malla=turf.interpolate(usados,size,{gridType:"point",property:"viento",units:"kilometers",weight:3});
-		//crear isobandas
+		//create isobands
+		try{
 		malla=turf.isobands(malla,[-1,0,5,10,20,30,500],{zProperty:"viento"});
-		//añadir al mapa
-		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+		//add to map
+		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.viento){
 						case String("-1-0"):
-							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "transparent", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("0-5"):
-							return {fillColor: "green", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "springgreen", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("5-10"):
-							return {fillColor: "yellow", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "greenyellow", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("10-20"):
-							return {fillColor: "orange", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "orange", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("20-30"):
-							return {fillColor: "red", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "red", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("30-100"):
-							return {fillColor: "purple", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "purple", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 							}
 						}
 		}).addTo(o);
+		}catch{}
 
 	break;
 	case "lluvia":
-		//eliminar la malla anterior, si existe
+		//Same as "viento" but now "lluvia"
 		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
-		//filtramos los valores de temperatura negativos o sobrantes
 		usados=usados.filter((val,ind,arr)=>{
 			return arr[ind].properties.lluvia>0;
 		});
 		usados=turf.featureCollection(usados);
-		
-		//ISOBANDAS
-		//crear la malla nueva para isobanda
 		malla=turf.interpolate(usados,size,{gridType:"point",property:"lluvia",units:"kilometers",weight:3});
-		//crear isobandas
+		try{
 		malla=turf.isobands(malla,[-1,0,2,5,10,20,30,500],{zProperty:"lluvia"});
-		//añadir al mapa
-		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.lluvia){
 						case String("-1-0"):
-							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "transparent", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("0-2"):
-							return {fillColor: "lightcyan", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "lightcyan", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("2-5"):
-							return {fillColor: "lightskyblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "lightskyblue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("5-10"):
-							return {fillColor: "skyblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "skyblue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("10-20"):
-							return {fillColor: "dodgerblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "dodgerblue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("20-30"):
-							return {fillColor: "blue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "blue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("30-100"):
-							return {fillColor: "darkblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "darkblue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 							}
 						}
 		}).addTo(o);
+		}catch{}
 
 	break;
 	case "temp":
-		//eliminar la malla anterior, si existe
+		//Same as "viento" but now "temp"
 		o.eachLayer(function(layer){if(layer.options.name=="turf"){o.removeLayer(layer);}});
-		//filtramos los valores de temperatura negativos o sobrantes
 		usados=usados.filter((val,ind,arr)=>{
-			return arr[ind].properties.temp>0;
+			return arr[ind].properties.temp>-30;
 		});
 		usados=turf.featureCollection(usados);
-		
-		//ISOBANDAS
-		//crear la malla nueva para isobanda
 		malla=turf.interpolate(usados,size,{gridType:"point",property:"temp",units:"kilometers",weight:3});
-		//crear isobandas
-		malla=turf.isobands(malla,[-1,0,5,10,20,30,100],{zProperty:"temp"});
-		//añadir al mapa
-		malla=L.geoJSON(malla,{name:"turf",zIndex:0,style: function(feature){
+		try{
+		malla=turf.isobands(malla,[-30,0,10,20,25,30,35,100],{zProperty:"temp"});
+		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.temp){
-						case String("-1-0"):
-							return {fillColor: "transparent", fillOpacity: 0.2, weight: 0,zIndex:0};
+						case String("-30-0"):
+							return {fillColor: "lightcyan", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
-						case String("0-5"):
-							return {fillColor: "lightcyan", fillOpacity: 0.2, weight: 0,zIndex:0};
-							break;
-						case String("5-10"):
-							return {fillColor: "dodgerblue", fillOpacity: 0.2, weight: 0,zIndex:0};
+						case String("0-10"):
+							return {fillColor: "dodgerblue", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 						case String("10-20"):
-							return {fillColor: "springgreen", fillOpacity: 0.2, weight: 0,zIndex:0};
+							return {fillColor: "springgreen", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
-						case String("20-30"):
-							return {fillColor: "gold", fillOpacity: 0.2, weight: 0,zIndex:0};
+						case String("20-25"):
+							return {fillColor: "greenyellow", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
-						case String("30-100"):
-							return {fillColor: "darkorange", fillOpacity: 0.2, weight: 0,zIndex:0};
+						case String("25-30"):
+							return {fillColor: "darkorange", fillOpacity: 0.5, weight: 0,zIndex:0};
+							break;
+						case String("30-35"):
+							return {fillColor: "red", fillOpacity: 0.5, weight: 0,zIndex:0};
+							break;
+						case String("35-100"):
+							return {fillColor: "mediumpurple", fillOpacity: 0.5, weight: 0,zIndex:0};
 							break;
 							}
 						}
 		}).addTo(o);
+		}catch{}
 		
-		//RECTANGULAR
-		//malla para rectangular
+		//RECTANGULAR GRID
 		/*malla=turf.interpolate(usados,size,{gridType:"square",property:"temp",units:"kilometers",weight:5});
-		//añadir al mapa
+		//add to map
 		malla=L.geoJSON(malla,{pane:"turf",name:"turf",style: function(feature){
 				var val=feature.properties.temp;
 					switch (true){
@@ -521,13 +525,14 @@ function pintaMET(){
     ini=1;
     }
     //empty legend
-    for (var i=1; i<=6;i++){
+    for (var i=1; i<=20;i++){
         window.document.getElementById("mkey"+i).style.display= "none";
         window.document.getElementById("mkey"+i).style.color="black";
         }
     //generate new legend for each type of data
     //(using the current icon to define the next key)
-    if (pinta=="cross"){
+    if (pinta=="lluvia"){
+		//Switch key to "temp"
         pinta="temp";
         window.document.getElementById("btmet").innerHTML="🌡";
     	window.document.getElementById("btmet").title="Temperatura (ºC)";
@@ -536,20 +541,27 @@ function pintaMET(){
         //set key
         mkey1.style.display="block";
         mkey1.style.background="LightCyan";
-        mkey1.innerHTML="0 - 5";
+        mkey1.innerHTML="-30 - 0";
         mkey2.style.display="block";
         mkey2.style.background="DodgerBlue";
-        mkey2.innerHTML="5 - 10";
+        mkey2.innerHTML="0 - 10";
         mkey3.style.display="block";
         mkey3.style.background="SpringGreen";
         mkey3.innerHTML="10 - 20";
         mkey4.style.display="block";
-        mkey4.style.background="Gold";
-        mkey4.innerHTML="20 - 30";
-        mkey5.style.display="block";
-        mkey5.style.background="DarkOrange";
-        mkey5.innerHTML="> 30";
+        mkey4.style.background="GreenYellow";
+        mkey4.innerHTML="20 - 25";
+		mkey5.style.display="block";
+        mkey5.style.background="darkorange";
+        mkey5.innerHTML="25 - 30";
+		mkey6.style.display="block";
+        mkey6.style.background="red";
+        mkey6.innerHTML="30 - 35";
+        mkey7.style.display="block";
+        mkey7.style.background="mediumpurple";
+        mkey7.innerHTML="> 35";
     }else if(pinta=="temp"){
+		//Switch key to "viento"
         pinta="viento";
         window.document.getElementById("btmet").innerHTML="🌪";
     	window.document.getElementById("btmet").title="Viento (Km/h)";
@@ -557,10 +569,10 @@ function pintaMET(){
         window.document.getElementById("mtxt").title="Viento (Km/h)";
         //set key
         mkey1.style.display="block";
-        mkey1.style.background="green";
+        mkey1.style.background="springgreen";
         mkey1.innerHTML="0 - 5";
         mkey2.style.display="block";
-        mkey2.style.background="yellow";
+        mkey2.style.background="greenyellow";
         mkey2.innerHTML="5 - 10";
         mkey3.style.display="block";
         mkey3.style.background="orange";
@@ -573,13 +585,8 @@ function pintaMET(){
         mkey5.style.background="purple";
         mkey5.innerHTML="> 30";
         mkey5.style.color="white";
-    }else if(pinta=="lluvia"){
-        pinta="cross";
-        window.document.getElementById("btmet").innerHTML="❌";
-    	window.document.getElementById("btmet").title="Sin clima";
-        window.document.getElementById("mtxt").innerHTML="<b>-</b>";
-        window.document.getElementById("mtxt").title="Sin clima";
     }else if(pinta=="viento"){
+		//Switch key to "lluvia"
         pinta="lluvia";
         window.document.getElementById("btmet").innerHTML="☔";
     	window.document.getElementById("btmet").title="Precipitación (l/m²)";
@@ -616,4 +623,3 @@ function pintaMET(){
 </script>
 
 </html>
-
