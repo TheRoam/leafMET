@@ -3,6 +3,8 @@ A library to display latest AEMET data in Leaflet JS.
 
 This branch includes TurfJS for interpolating data.
 
+Added Eurostat simplified country limit of Spain for intersection.
+
 **Usage:**
 
 The file "leafMET+Turf.html" is a single-file working app that includes data interpolation using TurfJS
