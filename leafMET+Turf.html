@@ -15,6 +15,7 @@
        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
        crossorigin=""></script>
 	<script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+	<script src="spain_eurostat_simp.js"></script>
 <style>
 .leaflet-popup-content{
 	max-width:150px;
@@ -62,8 +63,8 @@ var o = L.map('mapa',{	//added option to remove default attribution
 	}).setView([40.5, -3.5], 8);
 
         var IGN = window.L.tileLayer.wms("https://www.ign.es/wms-inspire/ign-base", {
-    		//layers: 'IGNBaseTodo-gris',
-			layers: 'IGNBaseTodo',
+    		layers: 'IGNBaseTodo-gris',
+			//layers: 'IGNBaseTodo',
     		format: 'image/png',
     		transparent: true,
     		attribution: "BCN IGN © 2022"
@@ -337,7 +338,7 @@ function colocaEnLaVista(){
 		
     break;
     case "temp":
-        if (sta[s].temp==null || sta[s].temp<=0){            
+        if (sta[s].temp==null || sta[s].temp<=-30){            
             sta[s].setTooltipContent("<span style='color:black;'>"+"-"+"</span>");
         }else if (sta[s].temp>-30 && sta[s].temp<0){
 			sta[s].setTooltipContent("<span style='color:LightCyan;'>"+JSON.stringify(sta[s].temp)+"</span>");
@@ -366,7 +367,14 @@ function colocaEnLaVista(){
     }
 	
 	//INTERPOLATIONS
+	//grid size
 	var size=10;
+	//country limit
+	var layer_spain_simple=new L.geoJson(json_spain_simple, {
+            attribution: '',
+            interactive: false
+			});
+			
 	switch(pinta){
     case "viento":
 		//remove previous grid if it exists
@@ -383,8 +391,32 @@ function colocaEnLaVista(){
 		//create isobands
 		try{
 		malla=turf.isobands(malla,[-1,0,5,10,20,30,500],{zProperty:"viento"});
+		//intersect with country limit
+		var recortes=[];
+		var limite=turf.featureCollection([layer_spain_simple.getLayers()[0].feature]);
+		malla.features.forEach(function(lyr1){
+				limite.features.forEach(function(lyr2){
+					let intersection=null;
+					try{
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 1");
+					}catch(e){
+						lyr1=turf.buffer(lyr1,10);
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 2");
+					}
+					if(intersection!=null){
+						intersection.properties=lyr1.properties;
+						recortes.push(intersection);
+						console.log(intersection);
+					}
+				});
+			});
+		let intersection = turf.featureCollection(recortes);
+		
 		//add to map
-		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		//malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		malla=L.geoJSON(intersection,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.viento){
 						case String("-1-0"):
 							return {fillColor: "transparent", fillOpacity: 0.5, weight: 0,zIndex:0};
@@ -420,7 +452,33 @@ function colocaEnLaVista(){
 		malla=turf.interpolate(usados,size,{gridType:"point",property:"lluvia",units:"kilometers",weight:3});
 		try{
 		malla=turf.isobands(malla,[-1,0,2,5,10,20,30,500],{zProperty:"lluvia"});
-		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		//intersect with country limit
+		var recortes=[];
+		var limite=turf.featureCollection([layer_spain_simple.getLayers()[0].feature]);
+		console.log(limite);
+		malla.features.forEach(function(lyr1){
+				limite.features.forEach(function(lyr2){
+					let intersection=null;
+					try{
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 1");
+					}catch(e){
+						lyr1=turf.buffer(lyr1,10);
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 2");
+					}
+					if(intersection!=null){
+						intersection.properties=lyr1.properties;
+						recortes.push(intersection);
+						console.log(intersection);
+					}
+				});
+			});
+		let intersection = turf.featureCollection(recortes);
+		
+		//add to map
+		//malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		malla=L.geoJSON(intersection,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.lluvia){
 						case String("-1-0"):
 							return {fillColor: "transparent", fillOpacity: 0.5, weight: 0,zIndex:0};
@@ -459,7 +517,32 @@ function colocaEnLaVista(){
 		malla=turf.interpolate(usados,size,{gridType:"point",property:"temp",units:"kilometers",weight:3});
 		try{
 		malla=turf.isobands(malla,[-30,0,10,20,25,30,35,100],{zProperty:"temp"});
-		malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		//intersect with country limit
+		var recortes=[];
+		var limite=turf.featureCollection([layer_spain_simple.getLayers()[0].feature]);
+		malla.features.forEach(function(lyr1){
+				limite.features.forEach(function(lyr2){
+					let intersection=null;
+					try{
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 1");
+					}catch(e){
+						lyr1=turf.buffer(lyr1,10);
+						intersection=turf.intersect(lyr1,lyr2);
+						console.log("intento 2");
+					}
+					if(intersection!=null){
+						intersection.properties=lyr1.properties;
+						recortes.push(intersection);
+						console.log(intersection);
+					}
+				});
+			});
+		let intersection = turf.featureCollection(recortes);
+		
+		//add to map
+		//malla=L.geoJSON(malla,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
+		malla=L.geoJSON(intersection,{pane:"turf",name:"turf",zIndex:0,style: function(feature){
 				switch (feature.properties.temp){
 						case String("-30-0"):
 							return {fillColor: "lightcyan", fillOpacity: 0.5, weight: 0,zIndex:0};
